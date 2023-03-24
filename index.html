@@ -21,10 +21,7 @@
             <div>Gamma: <input type="text" id="gamma" value="2.2"></div>
             <div>Brightness: <input type="text" id="brightness" value="1.0"></div>
             <div>Edge darkening: <input type="text" id="edge-darkening" value="0.5"></div>
-            <div>Seed: <input type="text" id="seed" value="1234"></div>
-            <div>Gen algo iterations: <input type="text" id="gen-algo-iterations" value="0"></div>
-            <div>Max nail offset: <input type="text" id="max-nail-offset" value="90"></div>
-            <div>Dead zone: <input type="text" id="dead-zone" value="90"></div>
+            <div>Dead zone: <input type="text" id="dead-zone" value="20"></div>
         </div>
         <div><input type="button" id="run" value="Run"></div>
         <div>
@@ -39,63 +36,57 @@
         <script src="a.out.js"></script>
         <script>
             Module.onRuntimeInitialized = _ => {
-                const setConfigParameters = Module.cwrap(
-                    'setConfigParameters',
-                    'void', 
-                    [
-                        'number',
-                        'number',
-                        'number',
-                        'number',
-                        'number',
-                        'number',
-                        'number',
-                        'number',
-                        'number',
-                        'number',
-                        'number'
-                    ]
-                );
-                
-                // int getNailIndices(float* data, int height, int width, int* output)
-                const getNailIndices = Module.cwrap(
-                    'getNailIndices',
+                /*
+                void* createBraider(
+                    int _nailCount,
+                    int _stringCount,
+                    float _stringWidth,
+                    float _stringIntensity,
+                    float _gamma,
+                    float _brightness,
+                    float _edgeDarkening,
+                    int _deadZone,
+                    float* data,
+                    int height,
+                    int width
+                )
+                */
+                const createBraider = Module.cwrap(
+                    'createBraider',
                     'number', 
                     [
                         'number',
                         'number',
                         'number',
+                        'number',
+                        'number',
+                        'number',
+                        'number',
+                        'number',
+                        'number',
+                        'number',
                         'number'
                     ]
                 );
 
-                function updateParameters() {
-                    const nail_count = parseInt(document.getElementById("nail-count").value);
-                    const string_count = parseInt(document.getElementById("string-count").value);
-                    const string_width = parseFloat(document.getElementById("string-width").value);
-                    const string_intensity = parseFloat(document.getElementById("string-intensity").value);
-                    const gamma = parseFloat(document.getElementById("gamma").value);
-                    const brightness = parseFloat(document.getElementById("brightness").value);
-                    const edge_darkening = parseFloat(document.getElementById("edge-darkening").value);
-                    const seed = parseInt(document.getElementById("seed").value);
-                    const gen_algo_iterations = parseInt(document.getElementById("gen-algo-iterations").value);
-                    const max_nail_offset = parseInt(document.getElementById("max-nail-offset").value);
-                    const dead_zone = parseInt(document.getElementById("dead-zone").value);
-
-                    setConfigParameters(
-                        nail_count,
-                        string_count,
-                        string_width,
-                        string_intensity,
-                        gamma,
-                        brightness,
-                        edge_darkening,
-                        seed,
-                        gen_algo_iterations,
-                        max_nail_offset,
-                        dead_zone
-                    );
-                }
+                // void deleteBraider(void* braider)
+                const deleteBraider = Module.cwrap(
+                    'deleteBraider',
+                    'void', 
+                    [
+                        'number'
+                    ]
+                );
+                
+                // void getNailIndices(void* braider_ptr, int* output)
+                const getNailIndices = Module.cwrap(
+                    'getNailIndices',
+                    'void', 
+                    [
+                        'number',
+                        'number'
+                    ]
+                );
 
                 const inputElement = document.getElementById("image-file");
                 const squareSize = document.getElementById("square-size");
@@ -111,12 +102,15 @@
                         return;
                     }
 
-                    // Update parameters
-                    updateParameters();
-
-                    // Get string count and nail count
-                    const string_count = parseInt(document.getElementById("string-count").value);
+                    // Get parameters
                     const nail_count = parseInt(document.getElementById("nail-count").value);
+                    const string_count = parseInt(document.getElementById("string-count").value);
+                    const string_width = parseFloat(document.getElementById("string-width").value);
+                    const string_intensity = parseFloat(document.getElementById("string-intensity").value);
+                    const gamma = parseFloat(document.getElementById("gamma").value);
+                    const brightness = parseFloat(document.getElementById("brightness").value);
+                    const edge_darkening = parseFloat(document.getElementById("edge-darkening").value);
+                    const dead_zone = parseInt(document.getElementById("dead-zone").value);
                     
                     // Get the image data
                     const imageData = ctx.getImageData(0, 0, canvas.width, canvas.height);
@@ -137,8 +131,26 @@
                     const nailIndicesPtr = Module._malloc((string_count + 1) * Int32Array.BYTES_PER_ELEMENT);
                     const nailIndices = new Int32Array(Module.HEAP32.buffer, nailIndicesPtr, string_count + 1);
 
+                    // Create the braider
+                    const braider = createBraider(
+                        nail_count,
+                        string_count,
+                        string_width,
+                        string_intensity,
+                        gamma,
+                        brightness,
+                        edge_darkening,
+                        dead_zone,
+                        grayDataPtr,
+                        canvas.height,
+                        canvas.width
+                    );
+
                     // Call the function
-                    const result = getNailIndices(grayDataPtr, canvas.height, canvas.width, nailIndicesPtr);
+                    getNailIndices(braider, nailIndicesPtr);
+
+                    // Delete the braider
+                    deleteBraider(braider);
 
                     // Cast to Uint8Array element-wise
                     const nailIndicesUint8 = new Uint8Array(nailIndices.length + 1);
