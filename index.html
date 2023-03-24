@@ -24,6 +24,7 @@
             <div>Seed: <input type="text" id="seed" value="1234"></div>
             <div>Gen algo iterations: <input type="text" id="gen-algo-iterations" value="0"></div>
             <div>Max nail offset: <input type="text" id="max-nail-offset" value="90"></div>
+            <div>Dead zone: <input type="text" id="dead-zone" value="90"></div>
         </div>
         <div><input type="button" id="run" value="Run"></div>
         <div>
@@ -42,6 +43,7 @@
                     'setConfigParameters',
                     'void', 
                     [
+                        'number',
                         'number',
                         'number',
                         'number',
@@ -78,6 +80,7 @@
                     const seed = parseInt(document.getElementById("seed").value);
                     const gen_algo_iterations = parseInt(document.getElementById("gen-algo-iterations").value);
                     const max_nail_offset = parseInt(document.getElementById("max-nail-offset").value);
+                    const dead_zone = parseInt(document.getElementById("dead-zone").value);
 
                     setConfigParameters(
                         nail_count,
@@ -89,7 +92,8 @@
                         edge_darkening,
                         seed,
                         gen_algo_iterations,
-                        max_nail_offset
+                        max_nail_offset,
+                        dead_zone
                     );
                 }
 

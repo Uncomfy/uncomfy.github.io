@@ -48,6 +48,7 @@ float edgeDarkening;
 int seed;
 int genAlgoIterations;
 int maxNailOffset;
+int deadZone;
 
 vector<vector<float>> transpose(const vector<vector<float>>& matrix) {
     int height = matrix.size();
@@ -176,7 +177,8 @@ vector<size_t> greedy(
         float minLoss = 1e9;
         size_t minNail = 0;
         for(int j = 0; j < nailCount; j++) {
-            if(j == prevNail || used[prevNail][j]) {
+            int dist = min({abs((int)j - (int)prevNail), abs((int)j - (int)prevNail - (int)nailCount), abs((int)j - (int)prevNail + (int)nailCount)});
+            if(j == prevNail || used[prevNail][j] || dist <= deadZone || (i > 1 && j == nailSequence[i - 2])) {
                 continue;
             }
             float loss = tryString(grayData, newGrayData, nailPositions[prevNail], nailPositions[j], stringWidth, stringIntensity);
@@ -395,7 +397,8 @@ extern "C" {
         float _edgeDarkening,
         int _seed,
         int _genAlgoIterations,
-        int _maxNailOffset
+        int _maxNailOffset,
+        int _deadZone
     ) {
         nailCount = _nailCount;
         stringCount = _stringCount;
@@ -407,6 +410,7 @@ extern "C" {
         seed = _seed;
         genAlgoIterations = _genAlgoIterations;
         maxNailOffset = _maxNailOffset;
+        deadZone = _deadZone;
     }
 
     EMSCRIPTEN_KEEPALIVE
