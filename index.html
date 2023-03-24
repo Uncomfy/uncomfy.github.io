@@ -9,7 +9,8 @@
     </head>
     <body>
         <div>
-            <canvas id="canvas"></canvas>
+            <canvas id="canvas" width="400" height="400"></canvas>
+            <svg id="svg_canvas" width="400" height="400"></svg>
         </div>
         <div id="params">
             <div><input type="file" id="image-file"></div>
@@ -32,6 +33,9 @@
             <a id="svg" href="https://alexgyver.github.io/GyverBraid/svg.html?" target="_blank">
                 <input type="button" value="SVG">
             </a>
+        </div>
+        <div id="log">
+            
         </div>
         <script src="a.out.js"></script>
         <script>
@@ -88,19 +92,71 @@
                     ]
                 );
 
+                // float doGreedyStep(void* braider_ptr, int i)
+                const doGreedyStep = Module.cwrap(
+                    'doGreedyStep',
+                    'void', 
+                    [
+                        'number',
+                        'number'
+                    ]
+                );
+
+                // void doGreedy(void* braider_ptr)
+                const doGreedy = Module.cwrap(
+                    'doGreedy',
+                    'void', 
+                    [
+                        'number'
+                    ]
+                );
+
                 const inputElement = document.getElementById("image-file");
                 const squareSize = document.getElementById("square-size");
                 const runButton = document.getElementById("run");
                 const canvas = document.getElementById("canvas");
+                const log = document.getElementById("log");
                 let img;
-                canvas.width = 400;
-                canvas.height = 400;
                 const ctx = canvas.getContext("2d");
+                const svgCanvas = document.getElementById("svg_canvas");
 
-                runButton.addEventListener("click", function() {
-                    if(!img) {
-                        return;
+                function drawToSvgCanvas(nailIndices, nail_count) {
+                    // Get canvas size in float from square size
+                    const canvasSize = parseFloat(squareSize.value);
+
+                    const radius = canvasSize / 2;
+
+                    // Function to convert nail id to point on circle
+                    const nailToCircle = (nailId) => {
+                        const angle = nailId * 2 * Math.PI / nail_count;
+                        return {
+                            x: radius + radius * Math.cos(angle),
+                            y: radius + radius * Math.sin(angle)
+                        };
+                    };
+
+                    // Clear the canvas
+                    svgCanvas.innerHTML = "";
+
+                    // Draw lines neighboring nails in nailIndices
+                    for (let i = 0; i < nailIndices.length-1; i++) {
+                        const nail1 = nailToCircle(nailIndices[i]);
+                        const nail2 = nailToCircle(nailIndices[i+1]);
+                        const line = document.createElementNS("http://www.w3.org/2000/svg", "line");
+                        line.setAttribute("x1", nail1.x);
+                        line.setAttribute("y1", nail1.y);
+                        line.setAttribute("x2", nail2.x);
+                        line.setAttribute("y2", nail2.y);
+                        line.setAttribute("stroke", "black");
+                        line.setAttribute("stroke-width", "0.3");
+                        line.setAttribute("opacity", "0.66666666");
+                        svgCanvas.appendChild(line);
                     }
+                }
+
+                async function braid() {
+                    // Get start time
+                    const start = performance.now();
 
                     // Get parameters
                     const nail_count = parseInt(document.getElementById("nail-count").value);
@@ -146,7 +202,23 @@
                         canvas.width
                     );
 
-                    // Call the function
+                    // Run step-by-step
+
+                    // Hack to avoid hanging the UI
+                    const delay = ms => new Promise(resolve => setTimeout(resolve, ms));
+
+                    for (let i = 1; i < string_count+1; i++) {
+                        doGreedyStep(braider, i);
+
+                        // Update log every 100 steps
+                        if (i % 100 === 0) {
+                            log.innerHTML = `Step ${i} of ${string_count}`;
+                            await delay(0);
+                        }
+                    }
+                    //doGreedy(braider);
+
+                    // Get the nail indices
                     getNailIndices(braider, nailIndicesPtr);
 
                     // Delete the braider
@@ -172,12 +244,30 @@
                     const svgLink = document.getElementById("svg");
                     svgLink.href = "https://alexgyver.github.io/GyverBraid/svg.html?" + nailIndicesBase64;
 
+                    // Add execution time to the log
+                    const end = performance.now();
+                    log.innerHTML += "<br>Execution time: " + (end - start).toFixed(2) + " ms";
+
+                    // Draw the braid
+                    drawToSvgCanvas(nailIndices, nail_count);
+
                     // Free memory
                     Module._free(grayDataPtr);
                     Module._free(nailIndicesPtr);
+                }
+
+                runButton.addEventListener("click", function() {
+                    if(!img) {
+                        return;
+                    }
+
+                    // Run the braid algorithm
+                    braid();
                 });
 
                 squareSize.addEventListener("change", function() {
+                    svgCanvas.setAttribute("width", squareSize.value);
+                    svgCanvas.setAttribute("height", squareSize.value);
                     canvas.width = squareSize.value;
                     canvas.height = squareSize.value;
                     ctx.drawImage(img, 0, 0, canvas.width, canvas.height);

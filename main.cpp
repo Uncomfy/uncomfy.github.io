@@ -129,6 +129,9 @@ public:
     float stringWidth;
     float stringIntensity;
     int deadZone;
+    int width;
+    int height;
+    float radius;
     vector<vector<float>> grayData;
     vector<vector<float>> newGrayData;
     vector<sf::Vector2f> nailPositions;
@@ -152,14 +155,14 @@ public:
         grayData = _grayData;
 
         // Get sizes
-        int width = grayData.size();
-        int height = grayData[0].size();
+        width = grayData.size();
+        height = grayData[0].size();
 
         // Initialize newGrayData
         newGrayData = vector<vector<float>>(width, vector<float>(height, 1.0f));
 
         // Make image into a circle
-        float radius = width / 2;
+        radius = width / 2;
         float radiusSquared = radius * radius;
         for (int i = 0; i < width; i++) {
             for (int j = 0; j < height; j++) {
@@ -199,12 +202,9 @@ public:
     ) {
         // Get bounding box
         int min_x = max(int(floor(min(s.x, e.x) - stringWidth)), 0);
-        int max_x = min(int(ceil(max(s.x, e.x) + stringWidth)), (int)grayData.size() - 1);
+        int max_x = min(int(ceil(max(s.x, e.x) + stringWidth)), width - 1);
         int min_y = max(int(floor(min(s.y, e.y) - stringWidth)), 0);
-        int max_y = min(int(ceil(max(s.y, e.y) + stringWidth)), (int)grayData[0].size() - 1);
-
-        // Get radius
-        float radius = grayData.size() / 2.0f;
+        int max_y = min(int(ceil(max(s.y, e.y) + stringWidth)), height - 1);
         
         // Compute the range in the "y" direction that string can cover
         float angle = atan2(abs(e.y - s.y), abs(e.x - s.x));
@@ -230,7 +230,6 @@ public:
                 float distance = lineSDF(sf::Vector2f(x + 0.5f, y + 0.5f), s, e);
                 if (distance < stringWidth) {
                     float newValue = newGrayData[x][y] - smoothstep(stringWidth, 0.0f, distance) * stringIntensity;
-                    //newValue = max(newValue, 0.0f);
                     float closs = newValue - grayData[x][y];
                     float ploss = newGrayData[x][y] - grayData[x][y];
                     float cdis = (x - radius) * (x - radius) + (y - radius) * (y - radius);
@@ -246,33 +245,36 @@ public:
         return loss;
     }
 
-    void greedy() {
-        // Get nail sequence
-        size_t prevNail = 0;
-        for(int i = 1; i <= stringCount; i++) {
-            // Print progress every 10 steps
-            // if (i % 10 == 0) {
-            //     cout << "\rGreedy: " << i << "/" << stringCount << " strings" << flush;
-            // }
-            
-            float minLoss = 1e9;
-            size_t minNail = 0;
-            for(int j = 0; j < nailCount; j++) {
-                int dist = min({abs((int)j - (int)prevNail), abs((int)j - (int)prevNail - (int)nailCount), abs((int)j - (int)prevNail + (int)nailCount)});
-                if(j == prevNail || dist <= deadZone || (i > 1 && j == nailIndices[i - 2])) {
-                    continue;
-                }
-                float loss = tryString(nailPositions[prevNail], nailPositions[j], stringWidth, stringIntensity);
-                if(loss < minLoss) {
-                    minLoss = loss;
-                    minNail = j;
-                }
+    float greedyStep(int i) {
+        // Get the previous nail
+        size_t prevNail = nailIndices[i - 1];
+
+        // Find the nail that minimizes the loss
+        float minLoss = 1e9;
+        size_t minNail = 0;
+        for(int j = 0; j < nailCount; j++) {
+            int dist = min({abs((int)j - (int)prevNail), abs((int)j - (int)prevNail - (int)nailCount), abs((int)j - (int)prevNail + (int)nailCount)});
+            if(j == prevNail || dist <= deadZone || (i > 1 && j == nailIndices[i - 2])) {
+                continue;
             }
+            float loss = tryString(nailPositions[prevNail], nailPositions[j], stringWidth, stringIntensity);
+            if(loss < minLoss) {
+                minLoss = loss;
+                minNail = j;
+            }
+        }
 
-            tryString(nailPositions[prevNail], nailPositions[minNail], stringWidth, stringIntensity, true);
+        tryString(nailPositions[prevNail], nailPositions[minNail], stringWidth, stringIntensity, true);
 
-            nailIndices[i] = minNail;
-            prevNail = minNail;
+        nailIndices[i] = minNail;
+
+        return minLoss;
+    }
+
+    void greedy() {
+        // Get nail sequence using greedy approach
+        for(int i = 1; i <= stringCount; i++) {
+            greedyStep(i);
         }
     }
 
@@ -287,24 +289,6 @@ public:
     }
 
     void process() {
-        // Get sizes
-        int width = grayData.size();
-        int height = grayData[0].size();
-
-        // Make image into a circle
-        float radius = width / 2;
-        float radiusSquared = radius * radius;
-        for (int i = 0; i < width; i++) {
-            for (int j = 0; j < height; j++) {
-                float x = i - radius;
-                float y = j - radius;
-                float distanceSquared = x * x + y * y;
-                if (distanceSquared > radiusSquared) {
-                    grayData[i][j] = 1.0f;
-                }
-            }
-        }
-
         // Use gready approach
         greedy();
         cout << "Greedy total loss: " << computeTotalLoss() << endl;
@@ -317,13 +301,30 @@ extern "C" {
         // Convert void pointer to Braider object
         Braider* braider = (Braider*)braider_ptr;
 
-        // Process image
-        braider->process();
-
         // Convert nail indices to array
         for (int i = 0; i < braider->stringCount + 1; i++) {
             output[i] = braider->nailIndices[i];
         }
+    }
+
+    EMSCRIPTEN_KEEPALIVE
+    void doGreedyStep(void* braider_ptr, int i) {
+        // Convert void pointer to Braider object
+        Braider* braider = (Braider*)braider_ptr;
+
+        // Do greedy step
+        braider->greedyStep(i);
+        return;
+    }
+
+    EMSCRIPTEN_KEEPALIVE
+    void doGreedy(void* braider_ptr) {
+        // Convert void pointer to Braider object
+        Braider* braider = (Braider*)braider_ptr;
+
+        // Do greedy
+        braider->greedy();
+        return;
     }
 
     EMSCRIPTEN_KEEPALIVE
