@@ -132,6 +132,7 @@ public:
     int width;
     int height;
     float radius;
+    float invRadiusSquared;
     vector<vector<float>> grayData;
     vector<vector<float>> newGrayData;
     vector<sf::Vector2f> nailPositions;
@@ -163,6 +164,7 @@ public:
 
         // Make image into a circle
         radius = width / 2;
+        invRadiusSquared = 1.0f / (radius * radius);
         float radiusSquared = radius * radius;
         for (int i = 0; i < width; i++) {
             for (int j = 0; j < height; j++) {
@@ -232,8 +234,7 @@ public:
                     float newValue = newGrayData[x][y] - smoothstep(stringWidth, 0.0f, distance) * stringIntensity;
                     float closs = newValue - grayData[x][y];
                     float ploss = newGrayData[x][y] - grayData[x][y];
-                    float cdis = (x - radius) * (x - radius) + (y - radius) * (y - radius);
-                    loss += (closs*closs - ploss*ploss) * (1.5f - cdis / radius / radius);
+                    loss += (closs*closs - ploss*ploss);
                     if (apply) {
                         newGrayData[x][y] = newValue;
                     }
