@@ -134,7 +134,6 @@ public:
     float radius;
     float invRadiusSquared;
     vector<vector<float>> grayData;
-    vector<vector<float>> newGrayData;
     vector<sf::Vector2f> nailPositions;
     vector<size_t> nailIndices;
 
@@ -159,9 +158,6 @@ public:
         width = grayData.size();
         height = grayData[0].size();
 
-        // Initialize newGrayData
-        newGrayData = vector<vector<float>>(width, vector<float>(height, 1.0f));
-
         // Make image into a circle
         radius = width / 2;
         invRadiusSquared = 1.0f / (radius * radius);
@@ -174,6 +170,13 @@ public:
                 if (distanceSquared > radiusSquared) {
                     grayData[i][j] = 1.0f;
                 }
+            }
+        }
+
+        // Invert image
+        for (int i = 0; i < width; i++) {
+            for (int j = 0; j < height; j++) {
+                grayData[i][j] = 1.0f - grayData[i][j];
             }
         }
 
@@ -231,12 +234,10 @@ public:
             for(int y = max(sy - offset, min_y); y <= min(sy + offset, max_y); y++) {
                 float distance = lineSDF(sf::Vector2f(x + 0.5f, y + 0.5f), s, e);
                 if (distance < stringWidth) {
-                    float newValue = newGrayData[x][y] - smoothstep(stringWidth, 0.0f, distance) * stringIntensity;
-                    float closs = newValue - grayData[x][y];
-                    float ploss = newGrayData[x][y] - grayData[x][y];
-                    loss += (closs*closs - ploss*ploss);
+                    float newValue = grayData[x][y] - smoothstep(stringWidth, 0.0f, distance) * stringIntensity;
+                    loss += (newValue*newValue - grayData[x][y]*grayData[x][y]);
                     if (apply) {
-                        newGrayData[x][y] = newValue;
+                        grayData[x][y] = newValue;
                     }
                 }
             }
@@ -283,7 +284,7 @@ public:
         float totalLoss = 0.0f;
         for (int i = 0; i < grayData.size(); i++) {
             for (int j = 0; j < grayData[0].size(); j++) {
-                totalLoss += (grayData[i][j] - newGrayData[i][j]) * (grayData[i][j] - newGrayData[i][j]);
+                totalLoss += grayData[i][j] * grayData[i][j];
             }
         }
         return totalLoss;
