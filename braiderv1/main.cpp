@@ -6,8 +6,6 @@
 #include <stdexcept>
 #include <vector>
 
-#include "emscripten.h"
-
 #define EPS 1e-6
 
 using namespace std;
@@ -298,7 +296,6 @@ public:
 };
 
 extern "C" {
-    EMSCRIPTEN_KEEPALIVE
     void getNailIndices(void* braider_ptr, int* output) {
         // Convert void pointer to Braider object
         Braider* braider = (Braider*)braider_ptr;
@@ -309,7 +306,6 @@ extern "C" {
         }
     }
 
-    EMSCRIPTEN_KEEPALIVE
     void doGreedyStep(void* braider_ptr, int i) {
         // Convert void pointer to Braider object
         Braider* braider = (Braider*)braider_ptr;
@@ -319,7 +315,6 @@ extern "C" {
         return;
     }
 
-    EMSCRIPTEN_KEEPALIVE
     void doGreedy(void* braider_ptr) {
         // Convert void pointer to Braider object
         Braider* braider = (Braider*)braider_ptr;
@@ -329,7 +324,6 @@ extern "C" {
         return;
     }
 
-    EMSCRIPTEN_KEEPALIVE
     void* createBraider(
         int _nailCount,
         int _stringCount,
@@ -383,7 +377,6 @@ extern "C" {
         return (void*)braider;
     }
 
-    EMSCRIPTEN_KEEPALIVE
     void deleteBraider(void* braider) {
         delete (Braider*)braider;
     }
